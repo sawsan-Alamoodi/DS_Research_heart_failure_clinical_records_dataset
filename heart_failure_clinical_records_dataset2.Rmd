@@ -1,0 +1,196 @@
+---
+title: "heart_failure_clinical_records_dataset"
+author: "Sawsan Alamoodi"
+date: "11/19/2020"
+output: html_document
+---
+# Description 
+The research question that this data will help us answer:
+# What are the greatest predictors for death by heart desease?
+
+# Data from:
+# https://www.kaggle.com/andrewmvd/heart-failure-clinical-data
+#https://www.kaggle.com/andrewmvd/heart-failure-clinical-data/discussion/193109
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+
+# load packages
+library(tidyverse)
+library(DT)
+library(rsample)
+library(caret)
+library(ggplot2)
+library(dplyr)
+library(h2o)
+library(modeldata)
+library(tidyr)
+
+```
+
+```{r}
+# import data
+heartfailure <- read_csv("heart_failure_clinical_records_dataset.csv")
+heartfailure <-as_tibble(heartfailure)
+```
+
+```{r}
+# explore the data
+glimpse(heartfailure)
+summary(heartfailure)
+names(heartfailure)
+view(heartfailure)
+```
+```{r}
+
+# Convert binary to factor variables (i.e. categorical):
+heartfailure <- heartfailure %>%
+  mutate(DEATH_EVENT = as.factor(DEATH_EVENT))
+
+glimpse(heartfailure)
+
+```
+```{r}
+#order age from smaller to elder
+ages<- heartfailure %>%
+  select(age) %>%
+  arrange(age)
+ages
+#to calculate the most occurred age
+heartfailure %>%
+  group_by(age)
+n<- table(as.vector(heartfailure$age))
+names(n)[n==max(n)]
+n
+plot(n)
+
+```
+
+```{r}
+ggplot(heartfailure, aes(x = age, fill = DEATH_EVENT)) +
+  geom_histogram()
+
+median(heartfailure$age)
+```
+
+
+```{r}
+##add variable age stages
+max(heartfailure$age)
+min(heartfailure$age)
+heartfailure <- heartfailure %>%  
+  group_by(age) %>%
+  mutate(agestage = case_when(age >= 40  & age <= 59 ~ 'Middle Age Adult',
+                              age >= 60  & age <= 95 ~ 'Senior Adult'  ))
+
+view(heartfailure)
+
+names(heartfailure)
+
+
+```
+
+```{r}
+#data transformation to help visualize the data better-readable
+summary(heartfailure$ejection_fraction)
+# take the avg of the Percentage of blood leaving the heart at each contraction
+as.integer(mean(heartfailure$ejection_fraction))
+
+heartfailure2<- heartfailure %>%
+  mutate(sex = if_else(sex==1,"Male","Female"),
+         anaemia= if_else(anaemia==1 ,"has anaemia","Normal"),
+         smoking= if_else(smoking==1 ,"Yes","No"),
+         high_blood_pressure=if_else(high_blood_pressure==1,"Yes","No"),
+         diabetes=if_else(diabetes==1 ,"Yes","No"), #sugar
+         ejection_fraction=if_else(ejection_fraction <=38 && ejection_fraction >= 14,"normal",
+                                  if_else(ejection_fraction>38 && ejection_fraction<=80,"high",
+                                          "normal")),
+         agestage=if_else(agestage=="Middle Age Adult","Middle Age Adult","Senior Adult"),
+         DEATH_EVENT=if_else(DEATH_EVENT==1,"Yes","No"),
+         creatinine_phosphokinase=as.factor(creatinine_phosphokinase),
+         age=as.factor(age),
+         serum_creatinine=as.factor(serum_creatinine),
+         platelets=as.factor(platelets),
+         serum_sodium=as.factor(serum_sodium)) %>%
+  mutate_if(is.character,as.factor) %>%
+  select(DEATH_EVENT,sex,agestage,high_blood_pressure,anaemia, creatinine_phosphokinase,smoking,serum_creatinine,diabetes,ejection_fraction,platelets,serum_sodium,everything())
+                                   
+         
+         
+```
+
+```{r}
+# ok,in age 60 what is make it the most predictors for death by heart disease?
+names(heartfailure)
+# is it by sex? this tell us that male(1) seems be more subject for heart disease!
+summary(heartfailure$sex)
+
+#to calculate is it female(0) or male(1) who is more likely to have heard disease
+heartfailure2 %>%
+  group_by(sex)
+sexx<- table(as.vector(heartfailure2$sex))
+names(sexx)[n==max(sexx)]
+sexx
+#heartfailure %>%
+ # ggplot(aes(x=sex ,col=sex, size=sex, labels="DEATH_EVENT by sex"))+
+  # geom_bar()
+ggplot(heartfailure2,aes(x=sex),col=sex)+
+ geom_bar(aes(fill=DEATH_EVENT),position ="dodge")
+
+#ggplot(heartfailure)+
+ # geom_density(aes(x=sex,y=DEATH_EVENT))
+
+```
+
+```{r}
+#barplot for DEATH_EVENT
+ggplot(heartfailure2,aes(x=heartfailure2$DEATH_EVENT, fill= DEATH_EVENT))+
+  geom_bar()+
+  xlab("Heart Disease")+
+  ylab("Count")+
+  ggtitle("Presence and Absence of Heart Disease")+
+  scale_alpha_discrete(name='Heart Disease', labels(c("Presence" , 'Absence')))
+```
+
+```{r}
+#
+prop.table(table(heartfailure2$DEATH_EVENT))
+```
+
+```{r}
+ str(heartfailure$diabetes) #factor
+ str(heartfailure$sex)      #factor
+ #checking there is no missing data:
+sum(is.na(heartfailure2))
+#complete.cases(heartfailure2$sex)
+ #handle
+ heartfailure2$diabetes2 <-as.character(heartfailure2$diabetes)
+ heartfailure2$sex2 <-as.character(heartfailure2$sex)
+ggplot(heartfailure2,aes( x=heartfailure2$sex2,y=heartfailure2$diabetes2))+
+ geom_boxplot()+
+ xlab('sex')+
+ ylab('diabetes')+
+ facet_grid( ~ agestage)
+
+```
+
+
+```{r}
+
+
+cor_heartfailure<-cor(heartfailure[ ,1:7])
+cor_heartfailure
+corrplot::corrplot(cor_heartfailure,method = 'square',type = 'upper')
+```
+
+
+
+     
+
+
+
+
+
